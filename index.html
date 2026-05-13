@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>WISDOM TRACE</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=Cinzel:wght@400;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet"/>
+
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --brown-deep:   #4a2c2a;
+  --brown-mid:    #6b3f3b;
+  --brown-warm:   #8c5450;
+  --brown-light:  #c4907a;
+  --cream:        #f5ede6;
+  --cream-dark:   #e8d5c4;
+  --gold:         #c9a96e;
+  --gold-light:   #e8d4a0;
+  --glass-bg:     rgba(74, 44, 42, 0.58);
+  --glass-border: rgba(201, 169, 110, 0.35);
+  --overlay-bg:   rgba(14, 7, 7, 0.75);
+}
+
+html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Inter', sans-serif; background: #1a0e0d; }
+
+/* MAP */
+#map { position: fixed; inset: 0; z-index: 1; cursor: crosshair; }
+.leaflet-tile { filter: sepia(20%) saturate(90%) brightness(0.92); }
+.leaflet-control-zoom, .leaflet-control-attribution { display: none !important; }
+
+/* HEADER */
+#header {
+  position: fixed; top: 22px; left: 50%; transform: translateX(-50%);
+  z-index: 100; padding: 14px 48px 12px;
+  background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 2px;
+  backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  text-align: center; pointer-events: none; white-space: nowrap;
+}
+#header h1 {
+  font-family: 'Cinzel', serif; font-size: 22px; font-weight: 600;
+  letter-spacing: 0.28em; color: var(--gold);
+  text-shadow: 0 0 30px rgba(201,169,110,0.45);
+}
+#header p {
+  font-family: 'Cormorant Garamond', serif; font-size: 12px; font-weight: 300;
+  letter-spacing: 0.22em; color: var(--cream-dark); margin-top: 3px; text-transform: uppercase;
+}
+
+/* SIDE NAV */
+#sidenav {
+  position: fixed; left: 24px; top: 50%; transform: translateY(-50%);
+  z-index: 100; display: flex; flex-direction: column; gap: 14px;
+}
+.nav-btn {
+  width: 46px; height: 46px;
+  background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 2px;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: background 0.25s, border-color 0.25s, transform 0.18s;
+  font-family: 'Cormorant Garamond', serif; font-size: 18px; color: var(--gold);
+}
+.nav-btn:hover { background: rgba(74,44,42,0.9); border-color: var(--gold); transform: scale(1.08); }
+
+/* COUNTER */
+#counter {
+  position: fixed; right: 24px; bottom: 30px; z-index: 100;
+  padding: 10px 20px; background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: 2px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); text-align: center;
+}
+#counter .count-num { font-family: 'Cinzel', serif; font-size: 26px; color: var(--gold); display: block; line-height: 1; }
+#counter .count-label {
+  font-family: 'Cormorant Garamond', serif; font-size: 11px; letter-spacing: 0.2em;
+  color: var(--cream-dark); text-transform: uppercase; margin-top: 3px; display: block;
+}
+
+/* HINT */
+#hint {
+  position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+  z-index: 100; padding: 8px 22px;
+  background: rgba(14,7,7,0.6); border: 1px solid rgba(201,169,110,0.18); border-radius: 2px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  font-family: 'Cormorant Garamond', serif; font-size: 14px; font-style: italic;
+  letter-spacing: 0.07em; color: rgba(232,213,196,0.65); pointer-events: none;
+}
+
+/* HEARTS */
+.wisdom-heart { cursor: pointer; transition: transform 0.22s; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.65)); }
+.wisdom-heart:hover { transform: scale(1.32); }
+.temp-heart {
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
+  animation: heartPop 0.38s cubic-bezier(0.34,1.56,0.64,1) forwards;
+  pointer-events: none;
+}
+@keyframes heartPop { from { transform: scale(0) } to { transform: scale(1) } }
+
+/* MODAL OVERLAY */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: var(--overlay-bg);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity 0.3s;
+  backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+
+.modal {
+  width: 350px;
+  background: linear-gradient(155deg, #311715 0%, #1c0f0e 100%);
+  border: 1px solid var(--glass-border); border-radius: 2px;
+  padding: 30px 28px 26px; position: relative;
+  transform: translateY(18px); transition: transform 0.32s;
+  box-shadow: 0 28px 90px rgba(0,0,0,0.75);
+}
+.modal-overlay.open .modal { transform: translateY(0); }
+
+.modal-close {
+  position: absolute; top: 14px; right: 16px;
+  background: none; border: none; cursor: pointer;
+  color: var(--brown-light); font-size: 20px;
+  font-family: 'Cormorant Garamond', serif; transition: color 0.2s; line-height: 1;
+}
+.modal-close:hover { color: var(--gold); }
+
+.modal-title {
+  font-family: 'Cinzel', serif; font-size: 12px; letter-spacing: 0.24em;
+  color: var(--gold); text-transform: uppercase; margin-bottom: 20px;
+  padding-bottom: 12px; border-bottom: 1px solid rgba(201,169,110,0.18);
+}
+
+.modal label {
+  display: block; font-family: 'Cormorant Garamond', serif; font-size: 12px;
+  letter-spacing: 0.16em; color: var(--brown-light); text-transform: uppercase;
+  margin-bottom: 6px; margin-top: 16px;
+}
+
+.modal input, .modal textarea {
+  width: 100%; background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(201,169,110,0.2); border-radius: 2px;
+  padding: 9px 12px; color: var(--cream);
+  font-family: 'Inter', sans-serif; font-size: 14px;
+  outline: none; transition: border-color 0.2s; resize: none;
+}
+.modal input:focus, .modal textarea:focus { border-color: var(--gold); }
+.modal textarea { height: 100px; }
+
+/* Young message */
+#youngMessage {
+  display: none; margin-top: 18px; padding: 18px 16px;
+  background: rgba(201,169,110,0.06);
+  border: 1px solid rgba(201,169,110,0.2); border-radius: 2px; text-align: center;
+}
+#youngMessage .young-icon { font-size: 28px; display: block; margin-bottom: 12px; }
+#youngMessage .young-text {
+  font-family: 'Cormorant Garamond', serif; font-size: 17px; font-style: italic;
+  font-weight: 300; line-height: 1.75; color: var(--gold-light);
+}
+#youngMessage .young-sub {
+  margin-top: 12px; font-family: 'Cormorant Garamond', serif;
+  font-size: 14px; color: var(--brown-light); letter-spacing: 0.07em;
+}
+
+/* Wisdom section */
+#wisdomSection { transition: opacity 0.3s; }
+#wisdomSection.hidden { display: none; }
+
+.modal-btn {
+  margin-top: 20px; width: 100%; padding: 11px;
+  background: var(--brown-deep); border: 1px solid var(--gold); border-radius: 2px;
+  color: var(--gold); font-family: 'Cinzel', serif; font-size: 12px; letter-spacing: 0.22em;
+  cursor: pointer; transition: background 0.22s, color 0.22s;
+}
+.modal-btn:hover { background: var(--gold); color: var(--brown-deep); }
+.modal-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* PANEL */
+.panel-overlay {
+  position: fixed; inset: 0; z-index: 200; background: var(--overlay-bg);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity 0.3s;
+  backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+}
+.panel-overlay.open { opacity: 1; pointer-events: all; }
+.panel {
+  width: 480px; max-width: 94vw;
+  background: linear-gradient(155deg, #311715 0%, #1c0f0e 100%);
+  border: 1px solid var(--glass-border); border-radius: 2px;
+  padding: 36px 32px 32px; position: relative;
+  transform: translateY(16px); transition: transform 0.3s;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.72);
+}
+.panel-overlay.open .panel { transform: translateY(0); }
+.panel-close {
+  position: absolute; top: 14px; right: 16px; background: none; border: none;
+  cursor: pointer; color: var(--brown-light); font-size: 22px;
+  font-family: 'Cormorant Garamond', serif; transition: color 0.2s;
+}
+.panel-close:hover { color: var(--gold); }
+.panel h2 {
+  font-family: 'Cinzel', serif; font-size: 14px; letter-spacing: 0.26em;
+  color: var(--gold); margin-bottom: 20px; padding-bottom: 14px;
+  border-bottom: 1px solid rgba(201,169,110,0.18);
+}
+.panel p { font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 300; line-height: 1.75; color: var(--cream-dark); margin-bottom: 14px; }
+.panel .gold-line { font-style: italic; color: var(--gold); margin-top: 10px; font-size: 17px; }
+.contact-item { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; font-family: 'Cormorant Garamond', serif; font-size: 18px; color: var(--cream-dark); }
+.contact-item a { color: var(--gold); text-decoration: none; }
+.contact-item a:hover { text-decoration: underline; }
+.contact-icon { width: 32px; height: 32px; border: 1px solid rgba(201,169,110,0.28); border-radius: 2px; display: flex; align-items: center; justify-content: center; color: var(--gold); font-size: 15px; flex-shrink: 0; }
+
+/* POPUP */
+.leaflet-popup-content-wrapper {
+  background: linear-gradient(155deg, #311715, #1c0f0e) !important;
+  border: 1px solid rgba(201,169,110,0.32) !important;
+  border-radius: 2px !important;
+  box-shadow: 0 14px 48px rgba(0,0,0,0.65) !important;
+  padding: 0 !important;
+}
+.leaflet-popup-tip { background: #311715 !important; }
+.leaflet-popup-content { margin: 0 !important; padding: 22px 24px !important; width: 250px !important; }
+.popup-age-block { margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid rgba(201,169,110,0.16); }
+.popup-age-num { font-family: 'Cinzel', serif; font-size: 32px; color: var(--gold); display: block; line-height: 1; }
+.popup-age-label { font-family: 'Cormorant Garamond', serif; font-size: 12px; letter-spacing: 0.16em; color: var(--brown-light); text-transform: uppercase; }
+.popup-wisdom { font-family: 'Cormorant Garamond', serif; font-size: 18px; font-style: italic; font-weight: 300; color: var(--cream); line-height: 1.65; }
+.popup-wisdom::before { content: '\201C'; color: var(--gold); font-size: 24px; }
+.popup-wisdom::after  { content: '\201D'; color: var(--gold); font-size: 24px; }
+.popup-name { margin-top: 10px; font-family: 'Cormorant Garamond', serif; font-size: 14px; color: var(--brown-light); text-align: right; }
+
+/* TOAST */
+#toast {
+  position: fixed; bottom: 84px; left: 50%; transform: translateX(-50%);
+  z-index: 300; padding: 10px 24px;
+  background: rgba(74,44,42,0.93); border: 1px solid var(--gold); border-radius: 2px;
+  font-family: 'Cormorant Garamond', serif; font-size: 16px; color: var(--gold-light);
+  opacity: 0; pointer-events: none; transition: opacity 0.4s; white-space: nowrap;
+}
+#toast.show { opacity: 1; }
+
+/* LOADING */
+#loading {
+  position: fixed; inset: 0; z-index: 400; background: #1a0e0d;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  transition: opacity 0.7s;
+}
+#loading h1 { font-family: 'Cinzel', serif; font-size: 30px; letter-spacing: 0.32em; color: var(--gold); }
+#loading p { font-family: 'Cormorant Garamond', serif; font-style: italic; color: var(--cream-dark); font-size: 15px; letter-spacing: 0.14em; }
+.loader-bar { width: 180px; height: 1px; background: rgba(201,169,110,0.18); border-radius: 1px; overflow: hidden; }
+.loader-fill { height: 100%; background: var(--gold); animation: load 1.7s ease forwards; }
+@keyframes load { from { width: 0 } to { width: 100% } }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <h1>WISDOM TRACE</h1>
+  <div class="loader-bar"><div class="loader-fill"></div></div>
+  <p>Gathering wisdom from around the world…</p>
+</div>
+
+<div id="map"></div>
+
+<header id="header">
+  <h1>WISDOM TRACE</h1>
+  <p>A Living Archive of Human Insight</p>
+</header>
+
+<nav id="sidenav">
+  <button class="nav-btn" id="btnAbout" title="About">i</button>
+  <button class="nav-btn" id="btnContact" title="Contact">@</button>
+</nav>
+
+<div id="counter">
+  <span class="count-num" id="heartCount">0</span>
+  <span class="count-label">Wisdoms</span>
+</div>
+
+<div id="hint">Click anywhere on the map to leave your wisdom ♥</div>
+<div id="toast"></div>
+
+<!-- ADD WISDOM MODAL -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <button class="modal-close" id="closeAddModal">✕</button>
+    <div class="modal-title">Leave Your Wisdom</div>
+
+    <label>Your Name <span style="opacity:0.4;font-size:11px;">(optional)</span></label>
+    <input type="text" id="wName" placeholder="Anonymous" maxlength="60"/>
+
+    <label>Your Age</label>
+    <input type="number" id="wAge" placeholder="Enter your age…" min="1" max="120"/>
+
+    <!-- Shown if age < 33 -->
+    <div id="youngMessage">
+      <span class="young-icon">🌱</span>
+      <p class="young-text">
+        You are still at the beautiful beginning of your journey.<br/>
+        These hearts were placed here by those who walked further<br/>
+        down the road — and they left their light for you.<br/>
+        Take a quiet moment. Read. Let their words find you.
+      </p>
+      <p class="young-sub">Your time to share will come. ♥</p>
+    </div>
+
+    <!-- Shown if age >= 33 -->
+    <div id="wisdomSection" class="hidden">
+      <label>Your Wisdom</label>
+      <textarea id="wWisdom" placeholder="Share something life has quietly taught you…" maxlength="400"></textarea>
+      <button class="modal-btn" id="submitWisdom">Pin My Wisdom ♥</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ABOUT PANEL -->
+<div class="panel-overlay" id="aboutPanel">
+  <div class="panel">
+    <button class="panel-close" id="closeAbout">✕</button>
+    <h2>About Wisdom Trace</h2>
+    <p>Wisdom Trace is a living, map-based archive dedicated to collecting and visualizing the insights of human beings across the globe. Every heart pinned on this map carries a trace of a life — its joys, its struggles, and the quiet lessons learned along the way.</p>
+    <p>The project was born from a simple conviction: wisdom is not locked inside books or institutions. It lives in people — in grandmothers, in students, in strangers on street corners.</p>
+    <p class="gold-line">"Leave a trace. Let your insight outlive the moment."</p>
+  </div>
+</div>
+
+<!-- CONTACT PANEL -->
+<div class="panel-overlay" id="contactPanel">
+  <div class="panel">
+    <button class="panel-close" id="closeContact">✕</button>
+    <h2>Contact the Curators</h2>
+    <p>We welcome questions, collaborations, and stories from around the world.</p>
+    <div class="contact-item"><div class="contact-icon">✉</div><span><a href="mailto: saroomii6@gmail.com">hello@wisdomtrace.org</a></span></div>
+    <p style="margin-top:16px;font-size:15px;color:var(--brown-light);">Response within 48 hours. All languages welcome.</p>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════
+   FIREBASE — replace with your config
+══════════════════════════════════════ */
+const firebaseConfig = {
+  apiKey: "AIzaSyD6eJhjiysJmmsAckwZxIfe525IZMOvVC4",
+  authDomain: "wisdom-trace.firebaseapp.com",
+  projectId: "wisdom-trace",
+  storageBucket: "wisdom-trace.firebasestorage.app",
+  messagingSenderId: "1098762843939",
+  appId: "1:1098762843939:web:ca25cfa1feecfadde5be96",
+  measurementId: "G-XXZP4JZQRJ"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+/* ══════════════════════════════════════
+   MAP SETUP
+══════════════════════════════════════ */
+const map = L.map('map', {
+  center: [20, 0], zoom: 2.5, zoomControl: false,
+  minZoom: 2, maxZoom: 10, worldCopyJump: false,
+  maxBounds: [[-90,-180],[90,180]], maxBoundsViscosity: 1.0
+});
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { noWrap: true, attribution: '' }).addTo(map);
+
+/* ══════════════════════════════════════
+   HEART ICON HELPER
+══════════════════════════════════════ */
+function buildHeartIcon(fill, opacity, cssClass) {
+  const svg = `<svg class="${cssClass}" xmlns="http://www.w3.org/2000/svg" width="28" height="26" viewBox="0 0 28 26">
+    <path d="M14 23S2 15.4 2 8a6 6 0 0 1 12-1 6 6 0 0 1 12 1C26 15.4 14 23 14 23z"
+      fill="${fill}" fill-opacity="${opacity}" stroke="rgba(201,169,110,0.55)" stroke-width="1"/>
+  </svg>`;
+  return L.divIcon({ className: '', html: svg, iconSize: [28,26], iconAnchor: [14,24], popupAnchor: [0,-26] });
+}
+
+/* ══════════════════════════════════════
+   RENDER A SAVED WISDOM MARKER
+══════════════════════════════════════ */
+let totalCount = 0;
+
+function renderMarker(d) {
+  const marker = L.marker([d.lat, d.lng], { icon: buildHeartIcon('#8c5450', 1, 'wisdom-heart') }).addTo(map);
+  const age    = d.age   || '?';
+  const name   = d.name  || 'Anonymous';
+  const wisdom = d.wisdom || '';
+
+  marker.bindPopup(`
+    <div class="popup-age-block">
+      <span class="popup-age-num">${age}</span>
+      <span class="popup-age-label">years of life</span>
+    </div>
+    <div class="popup-wisdom">${wisdom}</div>
+    <div class="popup-name">— ${name}</div>
+  `, { maxWidth: 300 });
+}
+
+/* ══════════════════════════════════════
+   LOAD FROM FIREBASE
+══════════════════════════════════════ */
+db.collection('wisdoms').orderBy('createdAt','desc').get()
+  .then(snap => {
+    totalCount = snap.size;
+    document.getElementById('heartCount').textContent = totalCount;
+    snap.forEach(doc => renderMarker(doc.data()));
+    fadeLoader();
+  })
+  .catch(() => fadeLoader());
+
+function fadeLoader() {
+  setTimeout(() => {
+    const l = document.getElementById('loading');
+    l.style.opacity = '0';
+    setTimeout(() => l.remove(), 700);
+  }, 1300);
+}
+
+/* ══════════════════════════════════════
+   MAP CLICK → TEMP HEART + MODAL
+══════════════════════════════════════ */
+let pendingLatLng = null;
+let tempMarker    = null;
+
+map.on('click', e => {
+  if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
+
+  pendingLatLng = e.latlng;
+
+  // Gold ghost heart appears immediately on click
+  tempMarker = L.marker(e.latlng, {
+    icon: buildHeartIcon('#c9a96e', 0.7, 'temp-heart'),
+    interactive: false
+  }).addTo(map);
+
+  // Reset modal
+  document.getElementById('wName').value   = '';
+  document.getElementById('wAge').value    = '';
+  document.getElementById('wWisdom').value = '';
+  document.getElementById('youngMessage').style.display = 'none';
+  document.getElementById('wisdomSection').classList.add('hidden');
+  document.getElementById('submitWisdom').disabled = false;
+  document.getElementById('submitWisdom').textContent = 'Pin My Wisdom ♥';
+
+  openModal('addModal');
+});
+
+/* ══════════════════════════════════════
+   THE 33 RULE — age input listener
+══════════════════════════════════════ */
+document.getElementById('wAge').addEventListener('input', function () {
+  const age = parseInt(this.value);
+  const youngMsg  = document.getElementById('youngMessage');
+  const wisdomSec = document.getElementById('wisdomSection');
+
+  if (isNaN(age) || this.value === '') {
+    youngMsg.style.display = 'none';
+    wisdomSec.classList.add('hidden');
+    return;
+  }
+
+  if (age < 33) {
+    youngMsg.style.display = 'block';
+    wisdomSec.classList.add('hidden');
+  } else {
+    youngMsg.style.display = 'none';
+    wisdomSec.classList.remove('hidden');
+  }
+});
+
+/* ══════════════════════════════════════
+   SUBMIT WISDOM
+══════════════════════════════════════ */
+document.getElementById('submitWisdom').addEventListener('click', async () => {
+  const wisdom = document.getElementById('wWisdom').value.trim();
+  const age    = parseInt(document.getElementById('wAge').value);
+  if (!wisdom) { showToast('Please share your wisdom before pinning.'); return; }
+  if (!pendingLatLng) return;
+
+  const btn = document.getElementById('submitWisdom');
+  btn.disabled = true;
+  btn.textContent = 'Pinning…';
+
+  const payload = {
+    lat:       pendingLatLng.lat,
+    lng:       pendingLatLng.lng,
+    wisdom,
+    name:      document.getElementById('wName').value.trim() || 'Anonymous',
+    age:       age || null,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  // Pin locally immediately — always works
+  if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
+  renderMarker(payload);
+  totalCount++;
+  document.getElementById('heartCount').textContent = totalCount;
+  map.flyTo([payload.lat, payload.lng], Math.max(map.getZoom(), 5), { duration: 1.2 });
+  closeModal('addModal');
+  showToast('Your wisdom has been pinned ♥');
+
+  // Save to Firebase in background
+  db.collection('wisdoms').add(payload).catch(err => {
+    console.warn('Firebase save failed (check config):', err.message);
+  });
+});
+
+/* ══════════════════════════════════════
+   MODAL / PANEL HELPERS
+══════════════════════════════════════ */
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function removeTempHeart() { if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; } }
+
+document.getElementById('closeAddModal').addEventListener('click', () => { closeModal('addModal'); removeTempHeart(); });
+document.getElementById('addModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('addModal')) { closeModal('addModal'); removeTempHeart(); }
+});
+
+document.getElementById('btnAbout').addEventListener('click', () => openModal('aboutPanel'));
+document.getElementById('closeAbout').addEventListener('click', () => closeModal('aboutPanel'));
+document.getElementById('aboutPanel').addEventListener('click', e => { if (e.target === document.getElementById('aboutPanel')) closeModal('aboutPanel'); });
+
+document.getElementById('btnContact').addEventListener('click', () => openModal('contactPanel'));
+document.getElementById('closeContact').addEventListener('click', () => closeModal('contactPanel'));
+document.getElementById('contactPanel').addEventListener('click', e => { if (e.target === document.getElementById('contactPanel')) closeModal('contactPanel'); });
+
+document.querySelectorAll('.modal, .panel').forEach(el => el.addEventListener('click', e => e.stopPropagation()));
+
+/* ══════════════════════════════════════
+   TOAST
+══════════════════════════════════════ */
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+</script>
+</body>
+</html>
