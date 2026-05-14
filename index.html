@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<meta name="description" content="Wisdom trace Wisdom Trace is a living, map-based archive dedicated to collecting and visualizing the insights of human beings across the globe. Every heart pinned on this map carries a trace of a life — its joys, its struggles, and the quiet lessons learned along the way.">
 <title>WISDOM TRACE</title>
+<meta name="description" content="Wisdom Trace is a living, map-based archive dedicated to collecting and visualizing the insights of human beings across the globe. Every heart pinned on this map carries a trace of a life — its joys, its struggles, and the quiet lessons learned along the way.">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -38,15 +38,14 @@ html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Inter', 
 
 /* HEADER */
 #header {
-  position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
-  z-index: 100; padding: 14px 15px 12px;
-  width: 90%; max-width: 500px;
+  position: fixed; top: 22px; left: 50%; transform: translateX(-50%);
+  z-index: 100; padding: 14px 48px 12px;
   background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 2px;
   backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
   text-align: center; pointer-events: none; white-space: nowrap;
 }
 #header h1 {
-  font-family: 'Cinzel', serif; font-size: clamp(16px, 4vw, 22px); font-weight: 600;
+  font-family: 'Cinzel', serif; font-size: 22px; font-weight: 600;
   letter-spacing: 0.28em; color: var(--gold);
   text-shadow: 0 0 30px rgba(201,169,110,0.45);
 }
@@ -255,6 +254,77 @@ html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Inter', 
 .loader-bar { width: 180px; height: 1px; background: rgba(201,169,110,0.18); border-radius: 1px; overflow: hidden; }
 .loader-fill { height: 100%; background: var(--gold); animation: load 1.7s ease forwards; }
 @keyframes load { from { width: 0 } to { width: 100% } }
+
+/* ─── MOBILE ────────────────────────────────────────── */
+@media (max-width: 600px) {
+
+  /* Header — smaller, tighter */
+  #header { padding: 10px 18px 8px; top: 14px; }
+  #header h1 { font-size: 15px; letter-spacing: 0.18em; }
+  #header p  { font-size: 9px; letter-spacing: 0.14em; }
+
+  /* Side nav — move to bottom-left, horizontal row */
+  #sidenav {
+    top: auto; bottom: 20px; left: 16px;
+    transform: none;
+    flex-direction: row; gap: 10px;
+  }
+  .nav-btn { width: 38px; height: 38px; font-size: 15px; }
+
+  /* Counter — top-right, smaller */
+  #counter { right: 14px; bottom: auto; top: 14px; padding: 6px 12px; }
+  #counter .count-num   { font-size: 18px; }
+  #counter .count-label { font-size: 9px; }
+
+  /* Hint — smaller font, doesn't overflow */
+  #hint {
+    font-size: 11px; padding: 6px 12px;
+    bottom: 20px; white-space: nowrap;
+    /* shift right so it doesn't overlap the nav buttons */
+    left: auto; right: 14px; transform: none;
+  }
+
+  /* Modal — full-width with safe margins */
+  .modal {
+    width: calc(100vw - 28px);
+    padding: 22px 18px 20px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal-title  { font-size: 11px; margin-bottom: 14px; padding-bottom: 10px; }
+  .modal label  { font-size: 11px; margin-top: 12px; }
+  .modal input  { font-size: 13px; padding: 8px 10px; }
+  .modal textarea { font-size: 13px; height: 80px; }
+  .modal-btn    { font-size: 11px; padding: 10px; margin-top: 14px; }
+
+  /* Young message */
+  #youngMessage { padding: 14px 12px; margin-top: 14px; }
+  #youngMessage .young-icon { font-size: 22px; margin-bottom: 8px; }
+  #youngMessage .young-text { font-size: 14px; line-height: 1.6; }
+  #youngMessage .young-sub  { font-size: 12px; margin-top: 8px; }
+
+  /* Panels — full-width */
+  .panel { padding: 26px 18px 22px; }
+  .panel h2 { font-size: 12px; margin-bottom: 14px; padding-bottom: 10px; }
+  .panel p  { font-size: 15px; line-height: 1.65; margin-bottom: 10px; }
+  .panel .gold-line { font-size: 14px; }
+  .contact-item { font-size: 15px; gap: 10px; }
+  .contact-icon { width: 28px; height: 28px; font-size: 13px; }
+
+  /* Popup */
+  .leaflet-popup-content { padding: 16px 16px !important; width: 200px !important; }
+  .popup-age-num    { font-size: 24px; }
+  .popup-age-label  { font-size: 10px; }
+  .popup-wisdom     { font-size: 15px; }
+  .popup-name       { font-size: 12px; }
+
+  /* Toast */
+  #toast { font-size: 13px; padding: 8px 16px; bottom: 68px; white-space: normal; text-align: center; max-width: 80vw; }
+
+  /* Loading screen */
+  #loading h1 { font-size: 20px; letter-spacing: 0.2em; }
+  #loading p  { font-size: 13px; }
+}
 </style>
 </head>
 <body>
@@ -340,7 +410,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Inter', 
     <p style="margin-top:16px;font-size:15px;color:var(--brown-light);">Response within 48 hours. All languages welcome.</p>
   </div>
 </div>
-
 <script>
 /* ══════════════════════════════════════
    FIREBASE — replace with your config
@@ -544,4 +613,4 @@ function showToast(msg) {
 }
 </script>
 </body>
-</html>
+</html> 
